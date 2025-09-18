@@ -103,15 +103,35 @@ def keepalive_ctyun2(parms,url="https://pc.ctyun.cn/#/login"):
         __g_logger.info("try start selenium")
         if(parms['browserType'] =='edge'):
             options.binary_location='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' if (parms['browserPath']=='') else parms['browserPath']
-            driver = webdriver.Edge(options=options)
+            # 检查本地Edge驱动
+            local_driver_path = os.path.join(os.getcwd(), "msedgedriver.exe")
+            if os.path.exists(local_driver_path):
+                __g_logger.info(f"使用本地Edge驱动: {local_driver_path}")
+                from selenium.webdriver.edge.service import Service as EdgeService
+                service = EdgeService(local_driver_path)
+                driver = webdriver.Edge(service=service, options=options)
+            else:
+                __g_logger.info("使用系统Edge驱动")
+                driver = webdriver.Edge(options=options)
         else:
             options.binary_location='D:\programs\chrome\chrome.exe' if (parms['browserPath']=='') else parms['browserPath']
-            driver = webdriver.Chrome(options=options)
+            # 检查本地Chrome驱动
+            local_chrome_driver = os.path.join(os.getcwd(), "chromedriver.exe")
+            if os.path.exists(local_chrome_driver):
+                __g_logger.info(f"使用本地Chrome驱动: {local_chrome_driver}")
+                from selenium.webdriver.chrome.service import Service as ChromeService
+                service = ChromeService(local_chrome_driver)
+                driver = webdriver.Chrome(service=service, options=options)
+            else:
+                __g_logger.info("使用系统Chrome驱动")
+                driver = webdriver.Chrome(options=options)
         driver.get(url)
         time.sleep(3)
         
         i=0
         bFoundVercode=False
+        captcha_retry_count = 0
+        max_captcha_retries = 3  # 最大验证码重试次数
         while i<len(ctyun_steps):
             step= ctyun_steps[i]
             __g_logger.info("step" + str(i+1) + ":"+ step['name']+",Now url:" +driver.current_url)
@@ -121,7 +141,12 @@ def keepalive_ctyun2(parms,url="https://pc.ctyun.cn/#/login"):
                     obj = driver.find_element(By.CLASS_NAME,'code')
                     objimg = driver.find_element(By.CLASS_NAME,'code-img')
                     if(obj.get_attribute('value')==''):
-                        __g_logger.warn("登录需要验证码!" + objimg.get_attribute('src') )
+                        captcha_retry_count += 1
+                        if captcha_retry_count > max_captcha_retries:
+                            __g_logger.error(f"验证码重试次数超过限制({max_captcha_retries})，程序退出")
+                            break
+                        
+                        __g_logger.warn(f"登录需要验证码! (第{captcha_retry_count}次尝试) " + objimg.get_attribute('src') )
                         pushmsg(parms['push_token'],'天翼云电脑保活需要验证码', listen_url)
                         driver.get_screenshot_as_file('static/ctyun.png')
                         objimg.screenshot("static/verifyCode.png")
@@ -129,12 +154,12 @@ def keepalive_ctyun2(parms,url="https://pc.ctyun.cn/#/login"):
                         if(parms['listenport']>0):
                             try:
                                 verifyCode=my_captcha.captcha_pic('static/verifyCode.png')
-                                if(verifyCode==None):
-                                    verifyCode= verifyCodeQueue.get(block=True,timeout=60)
-                                __g_logger.info('收到/识别验证码:'+verifyCode)
+                                if(verifyCode==None or verifyCode.strip()==''):
+                                    verifyCode= verifyCodeQueue.get(block=True,timeout=30)
+                                __g_logger.info('收到/识别验证码:'+str(verifyCode))
                             except Exception:
-                                __g_logger.warn("获取验证码超时(60s)")
-                                pass
+                                __g_logger.warn("获取验证码超时(30s)")
+                                verifyCode = "0000"  # 默认验证码
                         else:
                             verifyCode=input('请输入验证码:')
                         obj.clear()
@@ -159,7 +184,28 @@ def keepalive_ctyun2(parms,url="https://pc.ctyun.cn/#/login"):
                                 obj.clear()
                                 obj.send_keys( elem[3])
                             elif (elem[2]=='click'):
-                                obj.click()
+                                # 尝试多种点击方式
+                                try:
+                                    # 方法1：直接点击
+                                    obj.click()
+                                except Exception as e1:
+                                    try:
+                                        # 方法2：使用JavaScript点击
+                                        driver.execute_script("arguments[0].click();", obj)
+                                        __g_logger.info(f"使用JavaScript点击成功: {elem[0]}")
+                                    except Exception as e2:
+                                        try:
+                                            # 方法3：使用ActionChains点击
+                                            ActionChains(driver).move_to_element(obj).click().perform()
+                                            __g_logger.info(f"使用ActionChains点击成功: {elem[0]}")
+                                        except Exception as e3:
+                                            __g_logger.warn(f"所有点击方法都失败: {elem[0]}, 错误: {e1}, {e2}, {e3}")
+                                            # 等待一下再重试
+                                            time.sleep(2)
+                                            try:
+                                                obj.click()
+                                            except:
+                                                pass
                                 if(len(elem[3])>0): time.sleep(int(elem[3]))    #最后一步登录唤醒可能等待时间较长
                     except NoSuchElementException as e:
                         __g_logger.warn("element not found:" + elem[0] )

@@ -1,0 +1,47 @@
+{
+  "accounts": [
+    {
+      "id": 1,
+      "name": "吉林云电脑",
+      "account": "18943535261",
+      "password": "Ajqnvgvh252#",
+      "enabled": true,
+      "last_keepalive": "2025-09-18 15:55:25",
+      "status": "保活成功"
+    },
+    {
+      "id": 3,
+      "name": "河北保定阿福卡",
+      "account": "15354122464",
+      "password": "Ajqnvgvh252#",
+      "enabled": false,
+      "last_keepalive": "2025-09-18 08:02:17",
+      "status": "保活成功"
+    },
+    {
+      "id": 4,
+      "name": "河北衡水29",
+      "account": "18931814049",
+      "password": "Ajqnvgvh252#",
+      "enabled": true,
+      "last_keepalive": "2025-09-18 15:56:08",
+      "status": "保活成功"
+    }
+  ],
+  "settings": {
+    "keepalive_interval": 30,
+    "retry_times": 3,
+    "retry_delay": 10,
+    "browser_type": "edge",
+    "browser_path": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "headless": false,
+    "concurrent_limit": 3
+  },
+  "schedule": {
+    "enabled": true,
+    "interval_minutes": 5,
+    "start_time": "00:00",
+    "end_time": "23:59",
+    "weekend_enabled": true
+  }
+}
